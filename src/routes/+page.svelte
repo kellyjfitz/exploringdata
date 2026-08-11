@@ -3,7 +3,7 @@
 This is your page!
 -->
 <script>
-  import { base } from '$app/paths';
+
   // Import all the news furniture components
   import DatabaseHeader from '$lib/components/Data/DatabaseHeader.svelte';
   import ArticleBody from '$lib/components/Article/ArticleBody.svelte';
@@ -19,7 +19,7 @@ This is your page!
   // Article metadata
   let headline = 'Exploring data';
   let description = 'Finding interesting public data'
-  let leadImage = `${base}/photos/chart.png`
+  let leadImage = `/photos/chart.png`
 
 
   //let {data} = $props();
