@@ -1,0 +1,140 @@
+# GitHub Actions workflow to build and deploy to GitHub Pages
+#
+# This workflow runs automatically when you push to the main branch.
+#
+# HOW TO ENABLE:
+# 1. Go to your repository Settings > Pages
+# 2. Under "Source", select "GitHub Actions"
+# 3. Push changes to the main branch
+# 4. The workflow will build and deploy your site to https://<your-github-username>.github.io/<your-repository-name>/
+
+name: Continuous Deployment
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: 'pages-${{ github.ref }}'
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: Test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm run test
+
+  build-site:
+    runs-on: ubuntu-latest
+    name: Build site
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}
+
+      - name: Upload site artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-build
+          path: 'build'
+
+  build-storybook:
+    runs-on: ubuntu-latest
+    name: Build storybook
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Storybook
+        run: npm run build-storybook
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}
+
+      - name: Upload storybook artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: storybook-build
+          path: 'build/storybook'
+
+  package:
+    runs-on: ubuntu-latest
+    name: Package Pages artifact
+    needs:
+      - build-site
+      - build-storybook
+    steps:
+      - name: Download site artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: site-build
+          path: 'build'
+
+      - name: Download storybook artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: storybook-build
+          path: 'build/storybook'
+          if-no-files-found: ignore
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: 'build'
+
+  deploy:
+    name: Deploy
+    if: github.event_name != 'pull_request'
+    needs: package
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
